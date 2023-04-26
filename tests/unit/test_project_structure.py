@@ -493,6 +493,15 @@ class TestJobs(BaseExecutorDummyML):
 
     @patch('mindsdb.integrations.handlers.postgres_handler.Handler')
     def test_jobs(self, data_handler):
+        from mindsdb.interfaces.jobs.scheduler import Scheduler
+        scheduler = Scheduler({})
+
+        try:
+            self.jobs_test(data_handler, scheduler)
+        finally:
+            scheduler.stop_thread()
+
+    def jobs_test(self, data_handler, scheduler):
         df1 = pd.DataFrame([
             {'a': 1, 'c': 1, 'b': dt.datetime(2020, 1, 1)},
             {'a': 2, 'c': 1, 'b': dt.datetime(2020, 1, 2)},
@@ -546,12 +555,13 @@ class TestJobs(BaseExecutorDummyML):
 
         # run scheduler once
         data_handler.reset_mock()
-        from mindsdb.interfaces.jobs.scheduler import check_timetable
-        check_timetable(config={})
+
+        scheduler.check_timetable()
 
         # check query to integration
-        assert data_handler().query.call_args[0][0].to_string() ==\
-               "SELECT * FROM tbl1 WHERE tbl1.b > '1900-01-01 00:00:00'"
+        job = self.db.Jobs.query.filter(self.db.Jobs.name == 'j2').first()
+        create_at_str = job.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        assert data_handler().query.call_args[0][0].to_string() == f"SELECT * FROM tbl1 WHERE tbl1.b > '{create_at_str}'"
 
         # check jobs table
         ret = self.run_sql('select * from jobs', database='proj2')
@@ -566,12 +576,12 @@ class TestJobs(BaseExecutorDummyML):
         assert ret.PROJECT[0] == 'proj2' and ret.NAME[0] == 'j2'
 
         # run once again
-        check_timetable(config={})
+        scheduler.check_timetable()
 
         # job wasn't executed
         ret = self.run_sql('select * from jobs_history', database='proj2')
         assert len(ret) == 1
-        prev_run = ret.START_AT[0]
+        prev_run = ret.RUN_START[0]
 
         # shift 'next run' and run once again
         job = self.db.Jobs.query.filter(self.db.Jobs.name == 'j2').first()
@@ -579,7 +589,7 @@ class TestJobs(BaseExecutorDummyML):
         self.db.session.commit()
 
         data_handler.reset_mock()
-        check_timetable(config={})
+        scheduler.check_timetable()
 
         # check query to integration
         assert data_handler().query.call_args[0][0].to_string() == f"SELECT * FROM tbl1 WHERE tbl1.b > '{prev_run.strftime('%Y-%m-%d %H:%M:%S')}'"

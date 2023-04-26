@@ -99,6 +99,8 @@ class BaseUnitTest:
         db.session.add(r)
         r = db.Integration(name='merlion', data={}, engine='merlion')
         db.session.add(r)
+        r = db.Integration(name='statsforecast', data={}, engine='statsforecast')
+        db.session.add(r)
         r = db.Integration(name='dummy_ml', data={}, engine='dummy_ml')
         db.session.add(r)
         r = db.Integration(name='neuralforecast', data={}, engine='neuralforecast')
@@ -107,6 +109,7 @@ class BaseUnitTest:
         db.session.add(r)
         r = db.Integration(name='lightwood', data={}, engine='lightwood')
         db.session.add(r)
+
         db.session.flush()
         self.lw_integration_id = r.id
 
@@ -144,12 +147,11 @@ class BaseExecutorTest(BaseUnitTest):
         from mindsdb.api.mysql.mysql_proxy.controllers.session_controller import SessionController
 
         from mindsdb.api.mysql.mysql_proxy.executor.executor_commands import ExecuteCommands
-        from mindsdb.interfaces.database.integrations import IntegrationController
+        from mindsdb.interfaces.database.integrations import integration_controller
         from mindsdb.interfaces.file.file_controller import FileController
         from mindsdb.interfaces.model.model_controller import ModelController
         from mindsdb.utilities.context import context as ctx
 
-        integration_controller = IntegrationController()
         self.file_controller = FileController()
 
         if mock_model_controller:
